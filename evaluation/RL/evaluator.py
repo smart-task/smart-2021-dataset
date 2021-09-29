@@ -1,7 +1,7 @@
 import argparse
 import json
 import math
-
+from collections import Counter
 
 def load_gold_stardard(gold_path):
     gold_answers = dict()
@@ -30,7 +30,7 @@ def calculate_f1(precision, recall):
         return 2 * ((precision * recall) / (precision + recall))
 
 
-def evaluate(gold_answers, system_answers):
+def evaluate_dbpedia(gold_answers, system_answers):
     count, total_p, total_r, total_f1 = 0, 0, 0, 0
     for ques_id in gold_answers:
         count += 1
@@ -76,12 +76,34 @@ def evaluate(gold_answers, system_answers):
     return total_p/count, total_r/count, total_f1/count
 
 
+def evaluate_wikidata(gold_answers, system_answers):
+    count, total_p, total_r, total_f1 = 0, 0, 0, 0
+    for ques_id in gold_answers:
+        count += 1
+        # if an answer is not provided to a question, we just move on
+        if ques_id not in system_answers:
+            continue
+
+        system_relations = gold_answers[ques_id]
+        gold_relations = system_answers[ques_id]
+        precision = (sum((Counter(system_relations) & Counter(gold_relations)).values())) / len(system_relations)
+        recall = (sum((Counter(system_relations) & Counter(gold_relations)).values())) / len(gold_relations)
+        f1 = calculate_f1(precision, recall)
+        total_p += precision
+        total_r += recall
+        total_f1 += f1
+
+    return total_p/count, total_r/count, total_f1/count
+
+
 def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gt', type=str,
                         help='ground truth JSON file')
     parser.add_argument('--so', type=str,
                         help='system output JSON file')
+    parser.add_argument('--kb', type=str,
+                        help='Knowledge Base', default="dbpedia")
     args = parser.parse_args()
     return args
 
@@ -89,10 +111,17 @@ def arg_parser():
 def main(args):
     system_path = args.so
     gt_path = args.gt
+    kb = args.kb
     print(f"Config:\n\tGround truth: {gt_path}\n\tSystem path: {system_path}")
     gold_answers = load_gold_stardard(gt_path)
     system_answers = load_system_answers(system_path)
-    precision, recall, f1 = evaluate(gold_answers, system_answers)
+    if kb == "dbpedia":
+        precision, recall, f1 = evaluate_dbpedia(gold_answers, system_answers)
+    elif kb == "wikidata":
+        precision, recall, f1 = evaluate_wikidata(gold_answers, system_answers)
+    else:
+        raise Exception(f"Invalid KB: {kb}")
+
     print(f"\nResults:\n\tPrecision: {round(precision, 5)}\n\tRecall: {round(recall, 5)}\n\tF1: {round(f1, 5)}")
 
 
