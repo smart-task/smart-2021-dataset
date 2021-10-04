@@ -18,7 +18,10 @@ def load_system_answers(system_path):
     with open(system_path) as json_file:
         data = json.load(json_file)
     for ques in data:
-        system_answers[ques['id']] = ques['relations']
+        if 'relations' in ques:
+            system_answers[ques['id']] = ques['relations']
+        else:
+            print(f"Missing relations: {ques['id']}")
     print(f"\tsystem answers: loaded {len(data)} questions!")
     return system_answers
 
@@ -84,8 +87,10 @@ def evaluate_wikidata(gold_answers, system_answers):
         if ques_id not in system_answers:
             continue
 
-        system_relations = gold_answers[ques_id]
-        gold_relations = system_answers[ques_id]
+        gold_relations = gold_answers[ques_id]
+        system_relations = system_answers[ques_id]
+        if len(system_relations) == 0:
+            continue
         precision = (sum((Counter(system_relations) & Counter(gold_relations)).values())) / len(system_relations)
         recall = (sum((Counter(system_relations) & Counter(gold_relations)).values())) / len(gold_relations)
         f1 = calculate_f1(precision, recall)
